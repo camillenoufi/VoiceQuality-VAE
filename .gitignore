@@ -1,0 +1,18 @@
+#folders
+
+Drafts/
+Figures/
+checkpoints/
+
+#data
+VocalSet/
+MNIST/
+
+#run files
+
+run_fsvae.py
+run_gmvae.py
+run_ssvae.py
+
+#notebooks
+visualizations-VQVAE.ipynb
