@@ -7,7 +7,7 @@ from torch import autograd, nn, optim
 from torch.nn import functional as F
 
 class Encoder(nn.Module):
-    def __init__(self, z_dim, x_dim=24, h_dim=16, y_dim=0):
+    def __init__(self, z_dim, x_dim=12, h_dim=64, y_dim=0):
         super().__init__()
         self.z_dim = z_dim
         self.y_dim = y_dim
@@ -28,7 +28,7 @@ class Encoder(nn.Module):
         return m, v
 
 class Decoder(nn.Module):
-    def __init__(self, z_dim, x_dim=24, h_dim=16, y_dim=0):
+    def __init__(self, z_dim, x_dim=12, h_dim=64, y_dim=0):
         super().__init__()
         self.z_dim = z_dim
         self.y_dim = y_dim

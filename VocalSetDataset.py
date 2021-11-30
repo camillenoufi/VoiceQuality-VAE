@@ -12,7 +12,8 @@ class VocalSetDataset(Dataset):
                  directory_path,
                  measurements_filename,
                  device,
-                 normtype = 'mean'):
+                 normtype = 'mean',
+                 audio_embedding_model = None):
         self.device = device
         print(f'Using {device} as device for dataset.')
         self.dir_path = directory_path
@@ -23,6 +24,13 @@ class VocalSetDataset(Dataset):
         self.normtype = normtype
         self.feat_stats = {}
         self.df = self._load_dataframe()
+        if audio_embedding_model is not None:
+            self.audio_embedding_model = audio_embedding_model
+            self.embed_audio = True
+            self.audio_embeddings = self._create_audio_embeddings()
+        else:
+            self.embed_audio = False
+
 
     def __len__(self):
         return len(self.df)
@@ -31,18 +39,14 @@ class VocalSetDataset(Dataset):
         name = self._get_sample_name(index)
         measurements = self._get_sample_measurements(index).to(self.device)
         labels = self._get_sample_labels(name)
-        return name, measurements, labels
+        if self.embed_audio:
+            embedding = self.audio_embeddings[index]
+            return name, measurements, labels, embedding
+        else:
+            return name, measurements, labels
 
     def _get_data_frame(self):
         return self.df
-
-    def _read_measurements_file(self):
-        #read in measurements excel file produced by VoiceLab
-        xls = pd.ExcelFile(os.path.join(self.dir_path, self.measurements_filename))
-        df = pd.read_excel(xls, 'Summary') #all measurements in Summary sheet
-        df = df[df.columns.intersection(self.vq_measurements)]
-#         df.drop(list(df.filter(regex = 'Input File.')), axis = 1, inplace = True) #removes duplicate columns listing filename
-        return df
 
     def _load_dataframe(self):
         df = self._read_measurements_file()
@@ -52,6 +56,14 @@ class VocalSetDataset(Dataset):
         df = self._convert_to_float(df)
         self.df_names = df['Input File']
         df = self._normalize_features(df)
+        return df
+
+    def _read_measurements_file(self):
+        #read in measurements excel file produced by VoiceLab
+        xls = pd.ExcelFile(os.path.join(self.dir_path, self.measurements_filename))
+        df = pd.read_excel(xls, 'Summary') #all measurements in Summary sheet
+        df = df[df.columns.intersection(self.vq_measurements)]
+#         df.drop(list(df.filter(regex = 'Input File.')), axis = 1, inplace = True) #removes duplicate columns listing filename
         return df
     
     def _convert_to_float(self,df):
@@ -96,6 +108,14 @@ class VocalSetDataset(Dataset):
         row = self.df.iloc[index].tolist()
         return torch.tensor(row)
 
+    def _embed_audio(self, name):
+        filepath = os.path.join(self.dir_path, f'{name}.wav')
+        return self.audio_embedding_model.extract_features(filepath)
+    
+    def _create_audio_embeddings(self):
+        print('Creating audio embeddings using given model...')
+        return [self._embed_audio(name) for name in self.df_names]
+
     # The following methods create Corresponding Labels from VocalSet Filename Metadata
     def _removeItem(self,item, labels):
         if item in labels: labels.remove(item)
@@ -137,6 +157,7 @@ class VocalSetDataset(Dataset):
         # info,ext = os.path.splitext(filename)
         # if ext=='.csv':
         #     info = os.path.splitext(info)[0] #remove crepe .f0 tag
+        filename = filename[:-3]
         lbl = filename.split("_") #known delimiter
         return self._cleanUpLabels(lbl)
 
@@ -169,23 +190,22 @@ class VocalSetDataset(Dataset):
                  'Subharmonic Mean Pitch',
                  'Harmonics to Noise Ratio',
                  'Local Jitter',
-                 'Local Absolute Jitter',
-                 'RAP Jitter',
-                 'ppq5 Jitter',
-                 'ddp Jitter',
-                 'PCA Result',
-                 'local_shimmer',
+                 #'Local Absolute Jitter',
+                 #'RAP Jitter',
+                 #'ppq5 Jitter',
+                 #'ddp Jitter', #'PCA Result', <- causing error
+                 #'local_shimmer',
                  'localdb_shimmer',
-                 'apq3_shimmer',
-                 'aqpq5_shimmer',
-                 'apq11_shimmer',
-                 'dda_shimmer',
-                 'PCA Result.1',
+                 #'apq3_shimmer',
+                 #'aqpq5_shimmer',
+                 #'apq11_shimmer',
+                 #'dda_shimmer',
+                 #'PCA Result.1',
                  'cpp',
                  'Spectral Tilt',
                  'Centre of Gravity',
                  'Standard Deviation',
-                 'Kurtosis',
+                 #'Kurtosis',
                  'Skewness',
                  'Band Energy Difference',
                  'Band Density Difference']

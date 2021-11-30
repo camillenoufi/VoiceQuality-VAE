@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import functional as F
 
 class VAE(nn.Module):
-    def __init__(self, nn='vq_meas', name='vae', z_dim=2, x_dim=24, h_dim=16, beta=1):
+    def __init__(self, nn='vq_meas', name='vae', z_dim=4, x_dim=12, h_dim=64, beta=1):
         super().__init__()
         self.name = name
         self.z_dim = z_dim,

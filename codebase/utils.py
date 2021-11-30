@@ -267,7 +267,7 @@ def evaluate_classifier(model, test_set):
     print("Test set classification accuracy: {}".format(accuracy))
 
 
-def save_model_by_name(model, global_step, train_loss_arr, valid_loss_arr):
+def save_model_by_name(model, global_step, train_loss_arr, valid_loss_arr, rec_loss_arr, kld_arr):
     save_dir = os.path.join('checkpoints', model.name)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -277,9 +277,14 @@ def save_model_by_name(model, global_step, train_loss_arr, valid_loss_arr):
 
     train_loss_file_path = os.path.join(save_dir, 'train-loss_model-{:05d}.npy'.format(global_step))
     valid_loss_file_path = os.path.join(save_dir, 'valid-loss_model-{:05d}.npy'.format(global_step))
+    rec_loss_file_path = os.path.join(save_dir, 'rec-loss_model-{:05d}.npy'.format(global_step))
+    kld_file_path = os.path.join(save_dir, 'kld_model-{:05d}.npy'.format(global_step))
+
 
     np.save(train_loss_file_path, train_loss_arr, allow_pickle=True)
     np.save(valid_loss_file_path, valid_loss_arr, allow_pickle=True)
+    np.save(rec_loss_file_path, rec_loss_arr, allow_pickle=True)
+    np.save(kld_file_path, kld_arr, allow_pickle=True)
 
     print('Saved to {}'.format(file_path))
 

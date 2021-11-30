@@ -15,13 +15,20 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
     # Optimization
     if reinitialize:
         model.apply(ut.reset_weights)
-    min_lr = 1e-6
-    epochs_max = 50
+    min_lr = 1e-8
+    epochs_max = 100
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=5, verbose=True, min_lr=min_lr)
     
+    total_params = sum(p.numel() for p in model.parameters()) # if p.requires_grad) #remove requires_grad if want all params
+    print(f'Trainable Params: {total_params}')
+
+    # init logs
     train_loss_arr = []
     valid_loss_arr = []
+    rec_loss_arr = []
+    kld_arr = []
+
     i = 0
     epoch = 0
     with tqdm(total=epochs_max) as pbar:
@@ -29,6 +36,8 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
             model.train()
             train_loss = 0
             valid_loss = 1e6
+            rec_loss = 0
+            kld = 0
             for batch_idx, (nu, xu, lu) in enumerate(train_loader):
                 #lu[0] = gender, lu[1] = id, lu[2]=phrase, lu[3] = technique, lu[4] = vowel
                 i += 1 # i is num of gradient steps taken by end of loop iteration
@@ -37,26 +46,26 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
                 if y_status == 'none':
                     loss, summaries = model.loss(xu.float())
 
-                elif y_status == 'semisup':
-                    xu = torch.bernoulli(xu.to(device).reshape(xu.size(0), -1))
-                    yu = yu.new(np.eye(10)[yu]).to(device).float()
-                    # xl and yl already preprocessed
-                    xl, yl = labeled_subset
-                    xl = torch.bernoulli(xl)
-                    loss, summaries = model.loss(xu, xl, yl)
+                # elif y_status == 'semisup':
+                #     xu = torch.bernoulli(xu.to(device).reshape(xu.size(0), -1))
+                #     yu = yu.new(np.eye(10)[yu]).to(device).float()
+                #     # xl and yl already preprocessed
+                #     xl, yl = labeled_subset
+                #     xl = torch.bernoulli(xl)
+                #     loss, summaries = model.loss(xu, xl, yl)
 
-                    # Add training accuracy computation
-                    pred = model.cls(xu).argmax(1)
-                    true = yu.argmax(1)
-                    acc = (pred == true).float().mean()
-                    summaries['class/acc'] = acc
+                #     # Add training accuracy computation
+                #     pred = model.cls(xu).argmax(1)
+                #     true = yu.argmax(1)
+                #     acc = (pred == true).float().mean()
+                #     summaries['class/acc'] = acc
 
-                elif y_status == 'fullsup':
-                    # Janky code: fullsup is only for SVHN
-                    # xu is not bernoulli for SVHN
-                    xu = xu.to(device).reshape(xu.size(0), -1)
-                    yu = yu.new(np.eye(10)[yu]).to(device).float()
-                    loss, summaries = model.loss(xu, yu)
+                # elif y_status == 'fullsup':
+                #     # Janky code: fullsup is only for SVHN
+                #     # xu is not bernoulli for SVHN
+                #     xu = xu.to(device).reshape(xu.size(0), -1)
+                #     yu = yu.new(np.eye(10)[yu]).to(device).float()
+                #     loss, summaries = model.loss(xu, yu)
 
                 loss.backward()
                 optimizer.step()
@@ -66,7 +75,9 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
 
                 # Save model
                 if i % iter_save == 0:
-                    ut.save_model_by_name(model, i, train_loss_arr[:-1], valid_loss_arr)
+                    ut.save_model_by_name(model, i, 
+                                        train_loss_arr[:-1], valid_loss_arr,
+                                        rec_loss_arr, kld_arr)
 
                 # if i == iter_max:
                 #     return
@@ -74,6 +85,12 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
             #log average training loss for batch
             train_loss += loss/len(train_loader)
             train_loss_arr.append(train_loss.detach().numpy())
+
+            rec_loss += summaries['gen/rec']/len(train_loader)
+            rec_loss_arr.append(rec_loss.detach().numpy())
+
+            kld += summaries['gen/kl_z']/len(train_loader)
+            kld_arr.append(kld.detach().numpy())
                 
             # forward pass over validation set at end of each epoch
             model.eval()
@@ -87,7 +104,7 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
                 #log average validation loss for batch
                 valid_loss_arr.append(valid_loss.detach().numpy())
                 # scheduler.step(valid_loss)
-                #check early stopping criterion
+                # # check early stopping criterion
                 # if optimizer.param_groups[0]['lr'] == min_lr:
                 #     ut.save_model_by_name(model, i)
                 #     return
@@ -111,5 +128,7 @@ def train(model, train_loader, validation_loader, device, tqdm, writer,
 
             epoch += 1
             if epoch == epochs_max:
-                ut.save_model_by_name(model, epoch, train_loss_arr[:-1], valid_loss_arr)
+                ut.save_model_by_name(model, epoch, 
+                                        train_loss_arr[:-1], valid_loss_arr,
+                                        rec_loss_arr, kld_arr)
                 return
