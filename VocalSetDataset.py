@@ -12,8 +12,7 @@ class VocalSetDataset(Dataset):
                  directory_path,
                  measurements_filename,
                  device,
-                 normtype = 'mean',
-                 audio_embedding_model = None):
+                 normtype = 'mean'):
         self.device = device
         print(f'Using {device} as device for dataset.')
         self.dir_path = directory_path
@@ -24,12 +23,6 @@ class VocalSetDataset(Dataset):
         self.normtype = normtype
         self.feat_stats = {}
         self.df = self._load_dataframe()
-        if audio_embedding_model is not None:
-            self.audio_embedding_model = audio_embedding_model
-            self.embed_audio = True
-            self.audio_embeddings = self._create_audio_embeddings()
-        else:
-            self.embed_audio = False
 
 
     def __len__(self):
@@ -39,11 +32,11 @@ class VocalSetDataset(Dataset):
         name = self._get_sample_name(index)
         measurements = self._get_sample_measurements(index).to(self.device)
         labels = self._get_sample_labels(name)
-        if self.embed_audio:
-            embedding = self.audio_embeddings[index]
-            return name, measurements, labels, embedding
-        else:
-            return name, measurements, labels
+        # if self.embed_audio:
+        #     embedding = self.audio_embeddings[index]
+        #     return name, measurements, labels, embedding
+        # else:
+        return name, measurements, labels
 
     def _get_data_frame(self):
         return self.df
@@ -107,14 +100,6 @@ class VocalSetDataset(Dataset):
     def _get_sample_measurements(self, index):
         row = self.df.iloc[index].tolist()
         return torch.tensor(row)
-
-    def _embed_audio(self, name):
-        filepath = os.path.join(self.dir_path, f'{name}.wav')
-        return self.audio_embedding_model.extract_features(filepath)
-    
-    def _create_audio_embeddings(self):
-        print('Creating audio embeddings using given model...')
-        return [self._embed_audio(name) for name in self.df_names]
 
     # The following methods create Corresponding Labels from VocalSet Filename Metadata
     def _removeItem(self,item, labels):
@@ -209,3 +194,11 @@ class VocalSetDataset(Dataset):
                  'Skewness',
                  'Band Energy Difference',
                  'Band Density Difference']
+
+    def _embed_audio(self, name, embedding_model):
+        filepath = os.path.join(self.dir_path, f'{name}.wav')
+        return embedding_model.extract_features(filepath)
+    
+    def _create_audio_embeddings(self, embedding_model):
+        print('Creating audio embeddings using given model...')
+        return [self._embed_audio(name, embedding_model) for name in self.df_names]
